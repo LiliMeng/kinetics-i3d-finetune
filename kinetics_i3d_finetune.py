@@ -96,11 +96,6 @@ def main():
         logits = tf.squeeze(logits, [2, 3], name='SpatialSqueeze')
         averaged_logits = tf.reduce_mean(logits, axis=1)
 
-        print("averaged_logits")
-        print(averaged_logits)
-
-      # predictions = tf.nn.softmax(averaged_logits)
-
 
     rgb_variable_map = {}
 
@@ -121,23 +116,8 @@ def main():
     correct_prediction = tf.equal(tf.argmax(train_logits, 1), tf.argmax(labels_placeholder, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    # Initializing all the variables
-    init_op = tf.global_variables_initializer()
-
-    # Add ops to save and restore all the variables.
-    saver = tf.train.Saver()
-
-    # Create a summary monitor to cross_entropy
-    tf.summary.scalar('train_cross_entropy', train_cross_entropy)
-
-    summary_op = tf.summary.merge_all()
-
-    start_time = time.time()
-
-    
     config = tf.ConfigProto(allow_soft_placement = True)
-    init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
-    
+   
      # Initializing all the variables
     init_op = tf.global_variables_initializer()
 
@@ -165,7 +145,34 @@ def main():
         print('\033[91m' + "Total number of parameters: " +
               str(total_parameters) + '\033[0m')      
 
-        sess.run(init_op)
+        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+        variables_to_restore = []
+        for v in variables:
+          if v.name.split('/')[1]!='Logits':
+            if len(v.name.split('/')) > 2: 
+              if v.name.split('/')[2]!='Logits':
+                variables_to_restore.append(v)
+                #print(v)
+        for v in variables:
+          if v.name == 'Model/global_step:0':
+            variables_to_restore.append(v)
+            #print(v)
+        variables_to_init = []
+        for v in variables:
+          if v.name.split('/')[1] == 'Logits' or (len(v.name.split('/')) > 2 and v.name.split('/')[2] == 'logit'):
+            variables_to_init.append(v)
+
+        variables_to_save = variables_to_restore + variables_to_init
+        saver_before_fc = tf.train.Saver(variables_to_restore)
+        saver_after_fc = tf.train.Saver(variables_to_save)
+
+        if FLAGS.restore_from_model:
+            log.info("Restore checkpoint pretrined on kinetics ")
+            saver_before_fc.restore(sess, _CHECKPOINT_PATHS['rgb'])
+            log.info("Restored successfully")
+            sess.run(tf.variables_initializer(variables_to_init))
+        else:
+            sess.run(tf.global_variables_initializer())
 
         log_dir = os.path.join(FLAGS.log_dir_prefix, FLAGS.model +
                                time.strftime("_%b_%d_%H_%M", time.localtime()))
@@ -296,7 +303,7 @@ if __name__ == '__main__':
                                             help='Log directory. ["./log"]')
     parser.add_argument('--model_dir_prefix', type=str, default='./model',
                                             help='Model directory. ["./model"]')
-    parser.add_argument('--restore_from_model', type=bool, default=False, dest='restore_from_model',
+    parser.add_argument('--restore_from_model', type=bool, default=True, dest='restore_from_model',
                                             help='Restore from the previous trained model. [False]')
     parser.add_argument('--log_freq', type=int, default=1,
                                             help='Frequency of printing training accuracy in epochs. By default, print every 1 epoch. [1]')
