@@ -20,9 +20,16 @@ _SAMPLE_VIDEO_FRAMES = 15
 _IMAGE_SIZE = 224
 _NUM_CLASSES = 51
 _EPOCHS = 10
-_BATCH_SIZE = 4
+_BATCH_SIZE = 2
 
-TRAINING = True
+TRAINING = False
+
+_CHECKPOINT_PATHS = {
+    'rgb': 'data/checkpoints/rgb_scratch/model.ckpt',
+    'flow': 'data/checkpoints/flow_scratch/model.ckpt',
+    'rgb_imagenet': 'data/checkpoints/rgb_imagenet/model.ckpt',
+    'flow_imagenet': 'data/checkpoints/flow_imagenet/model.ckpt',
+}
 
 def _get_dataset_train(train_batch_size):
   """Prepares a dataset input tensors."""
@@ -104,7 +111,6 @@ def main():
         if variable.name.split('/')[0] == 'RGB':
             rgb_variable_map[variable.name.replace(':0', '')] = variable
 
-    #print(rgb_variable_map)
     rgb_saver = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
 
     train_logits = averaged_logits
@@ -147,19 +153,11 @@ def main():
 
         variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
         variables_to_restore = []
-        for v in variables:
-          if v.name.split('/')[1]!='Logits':
-            if len(v.name.split('/')) > 2: 
-              if v.name.split('/')[2]!='Logits':
-                variables_to_restore.append(v)
-                #print(v)
-        for v in variables:
-          if v.name == 'Model/global_step:0':
-            variables_to_restore.append(v)
-            #print(v)
         variables_to_init = []
         for v in variables:
-          if v.name.split('/')[1] == 'Logits' or (len(v.name.split('/')) > 2 and v.name.split('/')[2] == 'logit'):
+          if v.name.split('/')[2]!='Logits':
+            variables_to_restore.append(v)
+          else:
             variables_to_init.append(v)
 
         variables_to_save = variables_to_restore + variables_to_init
@@ -168,9 +166,8 @@ def main():
 
         if FLAGS.restore_from_model:
             print("Restore checkpoint pretrined on kinetics ")
-            saver_before_fc.restore(sess, _CHECKPOINT_PATHS['rgb'])
+            rgb_saver.restore(sess, _CHECKPOINT_PATHS['rgb'])
             print("Restored successfully")
-            sess.run(tf.variables_initializer(variables_to_init))
         else:
             sess.run(tf.global_variables_initializer())
 
@@ -187,11 +184,6 @@ def main():
         if tf.gfile.Exists(model_dir):
             tf.gfile.DeleteRecursively(model_dir)
         tf.gfile.MakeDirs(model_dir)
-
-        if FLAGS.restore_from_model:
-            # Restore the model from disk
-            saver.restore(sess, FLAGS.restore_ckpt)
-            print("Model restored from %s" % FLAGS.restore_ckpt)
 
         summary_writer = tf.summary.FileWriter(
             log_dir, graph=tf.get_default_graph())
@@ -285,7 +277,7 @@ if __name__ == '__main__':
                                             help='Filename of the dataset. [None]')
     parser.add_argument('--train_data_percent', type=float, default=1,
                                             help='The percentage of subsample of the training data. [1]')
-    parser.add_argument('--batch_size', type=int, default=4,
+    parser.add_argument('--batch_size', type=int, default=2,
                                             help='Batch size. [4]')
     parser.add_argument('--max_steps', type=int, default=100000,
                                             help='Max number of training steps. [20000]')
@@ -307,7 +299,7 @@ if __name__ == '__main__':
                                             help='Restore from the previous trained model. [False]')
     parser.add_argument('--log_freq', type=int, default=1,
                                             help='Frequency of printing training accuracy in epochs. By default, print every 1 epoch. [1]')
-    parser.add_argument('--test_batch_size', type=int, default=4,
+    parser.add_argument('--test_batch_size', type=int, default=2,
                                             help='Test batch size used to evaluate test accuracy. [8]')
     parser.add_argument('--num_gpus', type=int, default=1,
                                             help='Number of gpus to use')
