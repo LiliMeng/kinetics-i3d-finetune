@@ -14,6 +14,7 @@ from utils_input import *
 import i3d
 import os
 import sonnet
+import time
 
 _SAMPLE_VIDEO_FRAMES = 15
 _IMAGE_SIZE = 224
@@ -59,6 +60,15 @@ def main():
 
     labels_placeholder = tf.placeholder(tf.int64, shape=(_BATCH_SIZE))
 
+    learning_rate = tf.placeholder(tf.float32, [])
+    # Training or evaluation
+    is_training = tf.placeholder(tf.bool, [])
+
+    # Initialize regularization loss to zero.
+    reg_loss = 0
+    
+    lrn_rate_change = list(map(int, FLAGS.lrn_rate_change.split(',')))
+
     train_image_batch, train_label_batch = _get_dataset_train(_BATCH_SIZE)
     test_image_batch, test_label_batch = _get_dataset_test(_BATCH_SIZE)
 
@@ -103,15 +113,16 @@ def main():
     rgb_saver = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
 
     train_logits = averaged_logits
-    model_predictions = tf.nn.softmax(train_logits)
+    # train_logits= tf.nn.softmax(train_logits)
 
-    print("model_predictions")
-    print(model_predictions)
+    # print("train_logits")
 
-    # Training
-    train_cross_entropy = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(labels=labels_placeholder, logits=train_logits))
-    train_cross_entropy += reg_loss
+    # # Training
+    # train_cross_entropy = tf.reduce_mean(
+    #     tf.nn.softmax_cross_entropy_with_logits(labels=labels_placeholder, logits=train_logits))
+    # #train_cross_entropy += reg_loss
+
+    train_cross_entropy = tf.reduce_mean(train_logits)
 
     # train_step = tf.train.AdamOptimizer(0.1).minimize(train_cross_entropy)
     train_step = tf.train.MomentumOptimizer(
@@ -269,6 +280,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='HMDB51',
                                             help='Dataset:  ["HMDB51"] ')
+    parser.add_argument('--model', type=str, default='I3D',
+                        help='Model: "I3D" ')
     parser.add_argument('--filename', type=str, default=None,
                                             help='Filename of the dataset. [None]')
     parser.add_argument('--train_data_percent', type=float, default=1,
@@ -299,8 +312,8 @@ if __name__ == '__main__':
                                             help='Test batch size used to evaluate test accuracy. [8]')
     parser.add_argument('--num_gpus', type=int, default=1,
                                             help='Number of gpus to use')
-
-   
+    parser.add_argument('--hp_momentum', type=float, default=0.9,
+                        help='Momentum for MomentumOptimizer. [0.9]')
    
     parser.set_defaults(data_augment=True, use_bn=True, use_multiscale=False, ms_scale_weights=True, display_top_5=False, dataset_stand=True)                        
     FLAGS, unparsed = parser.parse_known_args()
