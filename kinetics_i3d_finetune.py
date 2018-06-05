@@ -12,12 +12,15 @@ from utils_input import *
 
 import i3d
 import os
+import sonnet
 
 _SAMPLE_VIDEO_FRAMES = 15
 _IMAGE_SIZE = 224
 _NUM_CLASSES = 51
 _EPOCHS = 10
 _BATCH_SIZE = 4
+
+TRAINING = True
 
 def _get_dataset_train(train_batch_size):
   """Prepares a dataset input tensors."""
@@ -59,13 +62,12 @@ def main():
     test_image_batch, test_label_batch = _get_dataset_test(_BATCH_SIZE)
 
     with tf.variable_scope('RGB'):
-      test_image_batch_arr, test_label_batch_arr = sess.run([test_image_batch, test_label_batch])
       rgb_model = i3d.InceptionI3d(_NUM_CLASSES, spatial_squeeze=True, final_endpoint='Mixed_5c')
       rgb_net, _ = rgb_model(images_placeholder, is_training=False, dropout_keep_prob=1.0)
       end_point = 'Logits'
       with tf.variable_scope(end_point):
         rgb_net = tf.nn.avg_pool3d(rgb_net, ksize=[1, 2, 7, 7, 1],
-                               strides=[1, 1, 1, 1, 1], padding=snt.VALID)
+                               strides=[1, 1, 1, 1, 1], padding=sonnet.VALID)
         if TRAINING:
             rgb_net = tf.nn.dropout(rgb_net, 0.7)
         logits = i3d.Unit3D(output_channels=_NUM_CLASSES,
