@@ -136,30 +136,30 @@ def main():
         sess.run(init_op)
 
         for step in xrange(200*num_steps_per_epoch):
-                if change_lrn_rate:
-                    if step < lrn_rate_change[0] * num_steps_per_epoch:
-                        lrn_rate = FLAGS.init_lrn_rate
-                    elif step < lrn_rate_change[1] * num_steps_per_epoch:
-                        lrn_rate = 0.1 * FLAGS.init_lrn_rate
-                    elif step < lrn_rate_change[2] * num_steps_per_epoch:
-                        lrn_rate = 0.01 * FLAGS.init_lrn_rate
-                    elif step < lrn_rate_change[3] * num_steps_per_epoch:
-                        lrn_rate = 0.001 * FLAGS.init_lrn_rate
-                    else:
-                        lrn_rate = 0.0001 * FLAGS.init_lrn_rate   
-
-                # Run training step
-                train_image_batch_arr, train_label_batch_arr = sess.run([train_image_batch, train_label_batch])
-                start_time = time.time()
-            
-                _, loss_value, train_acc, top_5_acc, t_c_e, r_l, lolz = sess.run([train_op, loss, mean_train_accuracy, mean_top_5_train, tce, rl, lololol], feed_dict={lr: lrn_rate,
-                    images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr}) 
                 
-                duration += time.time() - start_time
-               
-                if step %10 ==0:
+            if step < lrn_rate_change[0] * num_steps_per_epoch:
+                lrn_rate = FLAGS.init_lrn_rate
+            elif step < lrn_rate_change[1] * num_steps_per_epoch:
+                lrn_rate = 0.1 * FLAGS.init_lrn_rate
+            elif step < lrn_rate_change[2] * num_steps_per_epoch:
+                lrn_rate = 0.01 * FLAGS.init_lrn_rate
+            elif step < lrn_rate_change[3] * num_steps_per_epoch:
+                lrn_rate = 0.001 * FLAGS.init_lrn_rate
+            else:
+                lrn_rate = 0.0001 * FLAGS.init_lrn_rate   
 
-                    print("step " +str(step)+" train acc: "+str(train_acc))
+            # Run training step
+            train_image_batch_arr, train_label_batch_arr = sess.run([train_image_batch, train_label_batch])
+            start_time = time.time()
+        
+            _, loss_value, train_acc, top_5_acc, t_c_e, r_l, lolz = sess.run([train_op, loss, mean_train_accuracy, mean_top_5_train, tce, rl, lololol], feed_dict={lr: lrn_rate,
+                images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr}) 
+            
+            duration += time.time() - start_time
+           
+            if step %10 ==0:
+
+                print("step " +str(step)+" train acc: "+str(train_acc))
 
 
 if __name__ == '__main__':
