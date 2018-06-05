@@ -161,6 +161,7 @@ def main():
             saver_before_fc.restore(sess, _CHECKPOINT_PATHS['rgb'])
             print("Restored successfully")
             sess.run(tf.variables_initializer(variables_to_init))
+            print("variables_to_init is initialized successfully")
         else:
             sess.run(tf.global_variables_initializer())
 
@@ -197,7 +198,9 @@ def main():
 
             
             step_start_time = time.time()
+            print("begin to train")
             train_image_batch_arr, train_label_batch_arr = sess.run([train_image_batch, train_label_batch])
+            print("train_image_batch.shape: ", train_image_batch.shape)
             # Run training step
             train_step.run(feed_dict={
                 images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr, learning_rate: lrn_rate, is_training: True})
