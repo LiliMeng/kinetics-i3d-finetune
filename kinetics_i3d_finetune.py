@@ -5,9 +5,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
+from data_utils.imagenet_data import ImagenetData
+from data_utils.op_processing import distorted_inputs
+
 import i3d
 
-_SAMPLE_VIDEO_FRAMES = 64
+_SAMPLE_VIDEO_FRAMES = 15
 _IMAGE_SIZE = 224
 _NUM_CLASSES = 51
 _EPOCHS = 10
@@ -20,17 +23,21 @@ _MEAN_DATA = np.load("data/mean_data__ucf.npy")[np.newaxis, :, :, :, :]
 TRAINING = True
 print("Mean_Data: {}".format(_MEAN_DATA.shape))
 
-rgb_input = tf.placeholder(
-    tf.float32,
-    shape=(None, _SAMPLE_VIDEO_FRAMES, _IMAGE_SIZE, _IMAGE_SIZE, 3))
 
-y_true = tf.placeholder(
-    tf.float32,
-    shape=(None, _NUM_CLASSES))
+images_placeholder = tf.placeholder(tf.float32, shape=(_BATCH_SIZE, 
+                                                       _SAMPLE_VIDEO_FRAMES,
+                                                       _IMAGE_SIZE,
+                                                       _IMAGE_SIZE,
+                                                       3,
+                                                       ))
+
+labels_placeholder = tf.placeholder(tf.int64, shape=(_BATCH_SIZE, _NUM_CLASSES))
+
+
 
 with tf.variable_scope('RGB'):
   rgb_model = i3d.InceptionI3d(_NUM_CLASSES, spatial_squeeze=True, final_endpoint='Mixed_5c')
-  rgb_net, _ = rgb_model(rgb_input, is_training=False, dropout_keep_prob=1.0)
+  rgb_net, _ = rgb_model(images_input, is_training=False, dropout_keep_prob=1.0)
   end_point = 'Logits'
   with tf.variable_scope(end_point):
     rgb_net = tf.nn.avg_pool3d(rgb_net, ksize=[1, 2, 7, 7, 1],
