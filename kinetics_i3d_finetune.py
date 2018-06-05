@@ -113,18 +113,9 @@ def main():
     rgb_saver = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
 
     train_logits = averaged_logits
-    # train_logits= tf.nn.softmax(train_logits)
-
-    # print("train_logits")
-
-    # # Training
-    # train_cross_entropy = tf.reduce_mean(
-    #     tf.nn.softmax_cross_entropy_with_logits(labels=labels_placeholder, logits=train_logits))
-    # #train_cross_entropy += reg_loss
-
+    
     train_cross_entropy = tf.reduce_mean(train_logits)
 
-    # train_step = tf.train.AdamOptimizer(0.1).minimize(train_cross_entropy)
     train_step = tf.train.MomentumOptimizer(
         learning_rate, FLAGS.hp_momentum).minimize(train_cross_entropy)
     correct_prediction = tf.equal(tf.argmax(train_logits, 1), tf.argmax(labels_placeholder, 1))
@@ -198,7 +189,7 @@ def main():
         summary_writer = tf.summary.FileWriter(
             log_dir, graph=tf.get_default_graph())
 
-        epoch = data.num_train() // FLAGS.batch_size
+        epoch = dataset.num_train() // FLAGS.batch_size
         best_test_acc = 0
 
         for i in range(FLAGS.max_steps):
@@ -214,12 +205,12 @@ def main():
             else:
                 lrn_rate = 0.001 * FLAGS.init_lrn_rate
 
-            batch = data.next_batch(FLAGS.batch_size)
             
             step_start_time = time.time()
+            train_image_batch_arr, train_label_batch_arr = sess.run([train_image_batch, train_label_batch])
             # Run training step
             train_step.run(feed_dict={
-                x: batch[0], y_: batch[1], learning_rate: lrn_rate, is_training: True})
+                images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr, learning_rate: lrn_rate, is_training: True})
 
             #count the step duration
             #step_duration = time.time() - step_start_time
@@ -244,9 +235,8 @@ def main():
                 test_acc = 0
                 num_test_batches = data.num_test() // FLAGS.test_batch_size
                 for test_batch_start in range(num_test_batches):
-                    test_batch = data.next_batch_test(
-                        FLAGS.test_batch_size, test_batch_start)
-                    batch_test_acc = sess.run(accuracy, feed_dict={x: test_batch[0], y_: test_batch[1],
+                    test_image_batch_arr, test_label_batch_arr = sess.run([test_image_batch, test_label_batch])
+                    batch_test_acc = sess.run(accuracy, feed_dict={images_placeholder: test_image_batch_arr, labels: test_label_batch_arr,
                                                                    learning_rate: lrn_rate, is_training: False})
                     test_acc += batch_test_acc
                 test_acc /= num_test_batches

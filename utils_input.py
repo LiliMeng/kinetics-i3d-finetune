@@ -75,4 +75,11 @@ class DataSet(object):
 
         else: 
             raise Exception("Dataset: %s has not been implemented yet. Please check spelling." % dataset)
-  
+    
+    def num_train(self):
+        # The number of training samples
+        return self._num_train
+
+    def num_test(self):
+        # The number of test samples
+        return self._num_test
