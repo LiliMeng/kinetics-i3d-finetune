@@ -167,9 +167,9 @@ def main():
         saver_after_fc = tf.train.Saver(variables_to_save)
 
         if FLAGS.restore_from_model:
-            log.info("Restore checkpoint pretrined on kinetics ")
+            print("Restore checkpoint pretrined on kinetics ")
             saver_before_fc.restore(sess, _CHECKPOINT_PATHS['rgb'])
-            log.info("Restored successfully")
+            print("Restored successfully")
             sess.run(tf.variables_initializer(variables_to_init))
         else:
             sess.run(tf.global_variables_initializer())
