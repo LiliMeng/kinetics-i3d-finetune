@@ -34,7 +34,7 @@ import tensorflow as tf
 FLAGS = tf.app.flags.FLAGS
 
 # Basic model parameters.
-tf.app.flags.DEFINE_string('data_dir', './data/hmdb51_56/',
+tf.app.flags.DEFINE_string('data_dir', './data_utils/data/hmdb51_rgb_3d/',
                           """Path to the processed data, i.e. """
                           """TFRecord of Example protos.""")
 
