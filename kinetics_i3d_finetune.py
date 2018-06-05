@@ -106,16 +106,16 @@ def main():
 
     rgb_variable_map = {}
 
-    variable_to_init = []
+    variables_to_init = []
     for variable in tf.global_variables():
         if variable.name.split("/")[-4] == "Logits": 
-          variable_to_init.append(variable)
+          variables_to_init.append(variable)
           continue
         if variable.name.split('/')[0] == 'RGB':
             rgb_variable_map[variable.name.replace(':0', '')] = variable
 
     saver_before_fc = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
-   
+    saver_after_fc = tf.train.Saver(var_list=variables_to_init, reshape=True)
 
     train_logits = averaged_logits
     
@@ -158,7 +158,7 @@ def main():
 
         if FLAGS.restore_from_model:
             print("Restore checkpoint pretrined on kinetics ")
-            rgb_saver.restore(sess, _CHECKPOINT_PATHS['rgb'])
+            saver_before_fc.restore(sess, _CHECKPOINT_PATHS['rgb'])
             print("Restored successfully")
             sess.run(tf.variables_initializer(variables_to_init))
         else:
