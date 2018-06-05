@@ -57,7 +57,7 @@ def main():
                                                            3,
                                                            ))
 
-    labels_placeholder = tf.placeholder(tf.int64, shape=(_BATCH_SIZE, _NUM_CLASSES))
+    labels_placeholder = tf.placeholder(tf.int64, shape=(_BATCH_SIZE))
 
     train_image_batch, train_label_batch = _get_dataset_train(_BATCH_SIZE)
     test_image_batch, test_label_batch = _get_dataset_test(_BATCH_SIZE)
@@ -102,64 +102,166 @@ def main():
     #print(rgb_variable_map)
     rgb_saver = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
 
-    model_logits = averaged_logits
-    model_predictions = tf.nn.softmax(model_logits)
+    train_logits = averaged_logits
+    model_predictions = tf.nn.softmax(train_logits)
 
     print("model_predictions")
     print(model_predictions)
 
+    # Training
+    train_cross_entropy = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(labels=labels_placeholder, logits=train_logits))
+    train_cross_entropy += reg_loss
+
+    # train_step = tf.train.AdamOptimizer(0.1).minimize(train_cross_entropy)
+    train_step = tf.train.MomentumOptimizer(
+        learning_rate, FLAGS.hp_momentum).minimize(train_cross_entropy)
+    correct_prediction = tf.equal(tf.argmax(train_logits, 1), tf.argmax(labels_placeholder, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    # Initializing all the variables
+    init_op = tf.global_variables_initializer()
+
+    # Add ops to save and restore all the variables.
+    saver = tf.train.Saver()
+
+    # Create a summary monitor to cross_entropy
+    tf.summary.scalar('train_cross_entropy', train_cross_entropy)
+
+    summary_op = tf.summary.merge_all()
+
+    start_time = time.time()
 
     
     config = tf.ConfigProto(allow_soft_placement = True)
     init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
-    with tf.Session(config=config) as sess:
+    
+     # Initializing all the variables
+    init_op = tf.global_variables_initializer()
+
+    # Add ops to save and restore all the variables.
+    saver = tf.train.Saver()
+
+    # Create a summary monitor to cross_entropy
+    tf.summary.scalar('train_cross_entropy', train_cross_entropy)
+
+    summary_op = tf.summary.merge_all()
+
+    start_time = time.time()
+    with tf.Session() as sess:
 
         total_parameters = 0
         for variable in tf.trainable_variables():
+            print(variable.op.name)
             # shape is an array of tf.Dimension
             shape = variable.get_shape()
-            variable_parameters = 1
+            variable_parametes = 1
             for dim in shape:
-                variable_parameters *= dim.value
-            total_parameters += variable_parameters
+                variable_parametes *= dim.value
+            total_parameters += variable_parametes
 
         print('\033[91m' + "Total number of parameters: " +
-            str(total_parameters) + '\033[0m')  
+              str(total_parameters) + '\033[0m')      
 
-        # ProfileOptionBuilder = tf.profiler.ProfileOptionBuilder
-
-        # flops = tf.profiler.profile(tf.get_default_graph(), options=tf.profiler.ProfileOptionBuilder.float_operation())        
-        
-        # print('\033[91m' + "The number of flops: " +
-        #     str(flops) + '\033[0m')  
-        # Initializing Variables
         sess.run(init_op)
 
-        for step in xrange(200*num_steps_per_epoch):
-                
-            if step < lrn_rate_change[0] * num_steps_per_epoch:
+        log_dir = os.path.join(FLAGS.log_dir_prefix, FLAGS.model +
+                               time.strftime("_%b_%d_%H_%M", time.localtime()))
+
+        model_dir = os.path.join(FLAGS.model_dir_prefix, FLAGS.model +
+                                 time.strftime("_%b_%d_%H_%M", time.localtime()))
+
+        if tf.gfile.Exists(log_dir):
+            tf.gfile.DeleteRecursively(log_dir)
+        tf.gfile.MakeDirs(log_dir)
+
+        if tf.gfile.Exists(model_dir):
+            tf.gfile.DeleteRecursively(model_dir)
+        tf.gfile.MakeDirs(model_dir)
+
+        if FLAGS.restore_from_model:
+            # Restore the model from disk
+            saver.restore(sess, FLAGS.restore_ckpt)
+            print("Model restored from %s" % FLAGS.restore_ckpt)
+
+        summary_writer = tf.summary.FileWriter(
+            log_dir, graph=tf.get_default_graph())
+
+        epoch = data.num_train() // FLAGS.batch_size
+        best_test_acc = 0
+
+        for i in range(FLAGS.max_steps):
+            # Decrease the learning rate by a factor of 10, every
+            # FLAGS.lrn_rate_change epochs.
+
+            if i < lrn_rate_change[0] * epoch:
                 lrn_rate = FLAGS.init_lrn_rate
-            elif step < lrn_rate_change[1] * num_steps_per_epoch:
+            elif i < lrn_rate_change[1] * epoch:
                 lrn_rate = 0.1 * FLAGS.init_lrn_rate
-            elif step < lrn_rate_change[2] * num_steps_per_epoch:
+            elif i < lrn_rate_change[2] * epoch:
                 lrn_rate = 0.01 * FLAGS.init_lrn_rate
-            elif step < lrn_rate_change[3] * num_steps_per_epoch:
-                lrn_rate = 0.001 * FLAGS.init_lrn_rate
             else:
-                lrn_rate = 0.0001 * FLAGS.init_lrn_rate   
+                lrn_rate = 0.001 * FLAGS.init_lrn_rate
 
-            # Run training step
-            train_image_batch_arr, train_label_batch_arr = sess.run([train_image_batch, train_label_batch])
-            start_time = time.time()
-        
-            _, loss_value, train_acc, top_5_acc, t_c_e, r_l, lolz = sess.run([train_op, loss, mean_train_accuracy, mean_top_5_train, tce, rl, lololol], feed_dict={lr: lrn_rate,
-                images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr}) 
+            batch = data.next_batch(FLAGS.batch_size)
             
-            duration += time.time() - start_time
-           
-            if step %10 ==0:
+            step_start_time = time.time()
+            # Run training step
+            train_step.run(feed_dict={
+                x: batch[0], y_: batch[1], learning_rate: lrn_rate, is_training: True})
 
-                print("step " +str(step)+" train acc: "+str(train_acc))
+            #count the step duration
+            #step_duration = time.time() - step_start_time
+            #print("\033[1;32;40m Time per step:" + str(step_duration) + '\033[0m')
+
+
+            if i % (epoch * FLAGS.log_freq) == 0:
+                # Train the model, and also write summaries.
+                # Every 100th step, measure test accuracy, and write test
+                # summaries
+                train_accuracy, summary = sess.run([accuracy, summary_op], feed_dict={
+                    x: batch[0], y_: batch[1], learning_rate: lrn_rate, is_training: True})
+                print('step %d, epoch %d \ntraining accuracy: %g' %
+                      (i, i // epoch, train_accuracy))
+                train_summ = tf.Summary()
+                train_summ.value.add(tag='train_accuracy',
+                                     simple_value=train_accuracy)
+                summary_writer.add_summary(train_summ, i)
+                summary_writer.add_summary(summary, i)
+
+                # Evaluate test accuracy on all the test data
+                test_acc = 0
+                num_test_batches = data.num_test() // FLAGS.test_batch_size
+                for test_batch_start in range(num_test_batches):
+                    test_batch = data.next_batch_test(
+                        FLAGS.test_batch_size, test_batch_start)
+                    batch_test_acc = sess.run(accuracy, feed_dict={x: test_batch[0], y_: test_batch[1],
+                                                                   learning_rate: lrn_rate, is_training: False})
+                    test_acc += batch_test_acc
+                test_acc /= num_test_batches
+
+                print('test accuracy: %g' % test_acc)
+
+                if test_acc > best_test_acc:
+                    best_test_acc = test_acc
+
+                    # Save the best model
+                    ckpt_name = os.path.join(model_dir, "model_best.ckpt")
+                    save_path = saver.save(sess, ckpt_name)
+                    print("Model saved in file: %s" % save_path)
+
+                print('\033[91m' + "best test accuracy: " +
+                      str(round(best_test_acc, 6)) + '\033[0m')
+
+                test_summ = tf.Summary()
+                test_summ.value.add(tag='test_accuracy',
+                                    simple_value=test_acc)
+                summary_writer.add_summary(test_summ, i)
+        
+
+        summary_writer.close()
+
+        print("The whole process is done! Write result to file result_log.md")
 
 
 if __name__ == '__main__':
