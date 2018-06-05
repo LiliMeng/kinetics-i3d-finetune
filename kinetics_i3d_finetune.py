@@ -213,16 +213,18 @@ def main():
                 images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr, learning_rate: lrn_rate, is_training: True})
 
             #count the step duration
-            #step_duration = time.time() - step_start_time
-            #print("\033[1;32;40m Time per step:" + str(step_duration) + '\033[0m')
-
+            step_duration = time.time() - step_start_time
+            print("\033[1;32;40m Time per step:" + str(step_duration) + '\033[0m')
+            train_accuracy, summary = sess.run([accuracy, summary_op], feed_dict={
+                    x: batch[0], y_: batch[1], learning_rate: lrn_rate, is_training: True})
+            print("batch_{}: train_accuracy: ".format(i, train_accuracy))
 
             if i % (epoch * FLAGS.log_freq) == 0:
                 # Train the model, and also write summaries.
                 # Every 100th step, measure test accuracy, and write test
                 # summaries
                 train_accuracy, summary = sess.run([accuracy, summary_op], feed_dict={
-                    x: batch[0], y_: batch[1], learning_rate: lrn_rate, is_training: True})
+                    images_placeholder: train_image_batch_arr, labels_placeholder: train_label_batch_arr, learning_rate: lrn_rate, is_training: True})
                 print('step %d, epoch %d \ntraining accuracy: %g' %
                       (i, i // epoch, train_accuracy))
                 train_summ = tf.Summary()
