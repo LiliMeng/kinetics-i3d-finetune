@@ -106,12 +106,16 @@ def main():
 
     rgb_variable_map = {}
 
+    variable_to_init = []
     for variable in tf.global_variables():
-        if variable.name.split("/")[-4] == "Logits": continue
+        if variable.name.split("/")[-4] == "Logits": 
+          variable_to_init.append(variable)
+          continue
         if variable.name.split('/')[0] == 'RGB':
             rgb_variable_map[variable.name.replace(':0', '')] = variable
 
-    rgb_saver = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
+    saver_before_fc = tf.train.Saver(var_list=rgb_variable_map, reshape=True)
+   
 
     train_logits = averaged_logits
     
@@ -136,6 +140,7 @@ def main():
     summary_op = tf.summary.merge_all()
 
     start_time = time.time()
+
     with tf.Session() as sess:
 
         total_parameters = 0
@@ -151,23 +156,11 @@ def main():
         print('\033[91m' + "Total number of parameters: " +
               str(total_parameters) + '\033[0m')      
 
-        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-        variables_to_restore = []
-        variables_to_init = []
-        for v in variables:
-          if v.name.split('/')[2]!='Logits':
-            variables_to_restore.append(v)
-          else:
-            variables_to_init.append(v)
-
-        variables_to_save = variables_to_restore + variables_to_init
-        saver_before_fc = tf.train.Saver(variables_to_restore)
-        saver_after_fc = tf.train.Saver(variables_to_save)
-
         if FLAGS.restore_from_model:
             print("Restore checkpoint pretrined on kinetics ")
             rgb_saver.restore(sess, _CHECKPOINT_PATHS['rgb'])
             print("Restored successfully")
+            sess.run(tf.variables_initializer(variables_to_init))
         else:
             sess.run(tf.global_variables_initializer())
 
@@ -192,8 +185,6 @@ def main():
         best_test_acc = 0
 
         for i in range(FLAGS.max_steps):
-            # Decrease the learning rate by a factor of 10, every
-            # FLAGS.lrn_rate_change epochs.
 
             if i < lrn_rate_change[0] * epoch:
                 lrn_rate = FLAGS.init_lrn_rate
